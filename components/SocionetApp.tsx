@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { AppState, Chat, Identity, Message, Post, Profile, Story, Visibility } from '@/lib/types';
-import { loadState, resetState, saveState } from '@/lib/storage';
+import { AppState, Chat, Message, Post, Profile, Story, Visibility } from '@/lib/types';
+import { loadState, saveState } from '@/lib/storage';
 
-const id = () => Math.random().toString(36).slice(2, 10);
 const now = () => new Date().toISOString();
 
 const defaultState: AppState = {
@@ -20,29 +19,11 @@ const defaultState: AppState = {
   notif: { push: true, silentMode: false, priorityOnly: false, messages: true, posts: true, calls: true }
 };
 
-const makeIdentity = (): Identity => {
-  const principal = `ii-${crypto.randomUUID()}`;
-  const profileId = id();
-  return {
-    did: `did:socionet:${crypto.randomUUID()}`,
-    principal,
-    createdAt: now(),
-    anonymousMode: false,
-    activeProfileId: profileId,
-    profiles: [
-      {
-        id: profileId,
-        handle: `user_${principal.slice(3, 9)}`,
-        displayName: 'Primary Profile',
-        bio: 'Owner of this decentralized identity.',
-        tier: 'public',
-        isPrivate: false
-      }
-    ]
-  };
+const json = async (url: string, init?: RequestInit) => {
+  const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) } });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
 };
-
-const allUsers = ['alice', 'bob', 'charlie', 'diana', 'eve'];
 
 export default function SocionetApp() {
   const [state, setState] = useState<AppState>(defaultState);
@@ -53,51 +34,44 @@ export default function SocionetApp() {
   const [search, setSearch] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiOut, setAiOut] = useState('');
+  const [callLog, setCallLog] = useState<string[]>([]);
+  const [error, setError] = useState('');
+
+  const syncState = async () => {
+    const s = (await json('/api/state')) as AppState;
+    setState(s);
+    if (!activeChatId && s.chats[0]?.id) setActiveChatId(s.chats[0].id);
+    return s;
+  };
 
   useEffect(() => {
-    const loaded = loadState();
-    if (loaded) {
-      setState(loaded);
-      setActiveChatId(loaded.chats[0]?.id ?? '');
-      return;
-    }
-
-    const identity = makeIdentity();
-    const initialChat: Chat = {
-      id: id(),
-      title: 'Global Builders',
-      type: 'group',
-      participants: [identity.activeProfileId, 'alice', 'bob', 'charlie'],
-      pinned: true
+    const boot = async () => {
+      try {
+        const loaded = loadState();
+        if (loaded?.identity) setState(loaded);
+        await syncState();
+      } catch (e) {
+        setError((e as Error).message);
+      }
     };
-    const welcome: Message = {
-      id: id(),
-      chatId: initialChat.id,
-      by: 'alice',
-      text: 'Welcome to SOCIONET. End-to-end privacy mode enabled by default.',
-      createdAt: now()
-    };
-
-    const seeded: AppState = { ...defaultState, identity, chats: [initialChat], messages: [welcome] };
-    setState(seeded);
-    setActiveChatId(initialChat.id);
+    boot();
   }, []);
 
   useEffect(() => {
-    if (!state.identity) return;
-    saveState(state);
+    if (state.identity) saveState(state);
   }, [state]);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setState((prev) => {
         const nowTs = Date.now();
-        const filteredStories = prev.stories.filter((s) => new Date(s.expiresAt).getTime() > nowTs);
-        const filteredMsgs = prev.messages.filter((m) => !m.disappearsAt || new Date(m.disappearsAt).getTime() > nowTs);
-        if (filteredStories.length === prev.stories.length && filteredMsgs.length === prev.messages.length) return prev;
-        return { ...prev, stories: filteredStories, messages: filteredMsgs };
+        return {
+          ...prev,
+          stories: prev.stories.filter((s) => new Date(s.expiresAt).getTime() > nowTs),
+          messages: prev.messages.filter((m) => !m.disappearsAt || new Date(m.disappearsAt).getTime() > nowTs)
+        };
       });
-    }, 4000);
+    }, 3000);
     return () => clearInterval(timer);
   }, []);
 
@@ -109,55 +83,43 @@ export default function SocionetApp() {
     const q = search.trim().toLowerCase();
     if (!q) return null;
     return {
-      users: allUsers.filter((u) => u.includes(q)),
+      users: ['alice', 'bob', 'charlie', 'diana', 'eve'].filter((u) => u.includes(q)),
       posts: state.posts.filter((p) => p.text.toLowerCase().includes(q)),
       messages: state.messages.filter((m) => m.text.toLowerCase().includes(q))
     };
   }, [search, state.posts, state.messages]);
 
-  const createPost = () => {
-    if (!activeProfile || !postText.trim()) return;
-    const p: Post = {
-      id: id(),
-      authorProfileId: activeProfile.id,
-      text: postText.trim(),
-      visibility,
-      likes: [],
-      comments: [],
-      createdAt: now()
-    };
-    setState((s) => ({ ...s, posts: [p, ...s.posts] }));
+  const createIdentity = async () => {
+    await json('/api/identity', { method: 'POST' });
+    await syncState();
+  };
+
+  const createPost = async () => {
+    if (!postText.trim()) return;
+    await json('/api/posts', { method: 'POST', body: JSON.stringify({ text: postText, visibility }) });
     setPostText('');
+    await syncState();
   };
 
-  const sendMessage = () => {
-    if (!activeProfile || !activeChatId || !messageText.trim()) return;
-    const m: Message = { id: id(), chatId: activeChatId, by: activeProfile.id, text: messageText.trim(), createdAt: now() };
-    setState((s) => ({ ...s, messages: [...s.messages, m] }));
-    setMessageText('');
+  const patchPost = async (id: string, action: 'like' | 'comment' | 'edit', text?: string) => {
+    await json(`/api/posts/${id}`, { method: 'PATCH', body: JSON.stringify({ action, text }) });
+    await syncState();
   };
 
-  const sendScheduled = (minutes: number) => {
-    if (!activeProfile || !activeChatId || !messageText.trim()) return;
-    const sendAt = new Date(Date.now() + minutes * 60_000).toISOString();
-    const m: Message = {
-      id: id(),
-      chatId: activeChatId,
-      by: activeProfile.id,
-      text: `[Scheduled] ${messageText.trim()}`,
-      createdAt: now(),
-      scheduledFor: sendAt
-    };
-    setState((s) => ({ ...s, messages: [...s.messages, m] }));
-    setMessageText('');
+  const createChat = async () => {
+    const title = prompt('Chat title');
+    if (!title) return;
+    const chat = (await json('/api/chats', { method: 'POST', body: JSON.stringify({ title, type: 'group' }) })) as Chat;
+    await syncState();
+    if (chat?.id) setActiveChatId(chat.id);
   };
 
   const createStory = () => {
     if (!activeProfile) return;
-    const text = prompt('Story text (expires in 24h)');
+    const text = prompt('Story text');
     if (!text) return;
     const story: Story = {
-      id: id(),
+      id: crypto.randomUUID().slice(0, 8),
       by: activeProfile.id,
       text,
       createdAt: now(),
@@ -167,27 +129,46 @@ export default function SocionetApp() {
     setState((s) => ({ ...s, stories: [story, ...s.stories] }));
   };
 
-  const aiAssist = () => {
-    const promptTxt = aiPrompt.trim();
-    if (!promptTxt) return;
-    const out = [
-      'AI Assistant plan:',
-      '- Suggestion 1: Publish a short update and a story together for max reach.',
-      '- Suggestion 2: Enable close-friends visibility for sensitive content.',
-      '- Suggestion 3: Start a community channel and schedule a live Q&A.',
-      `- Generated response for: "${promptTxt}"`
-    ].join('\n');
-    setAiOut(out);
+  const sendMessage = async (scheduledFor?: string) => {
+    if (!activeChatId || !messageText.trim()) return;
+    await json('/api/messages', { method: 'POST', body: JSON.stringify({ chatId: activeChatId, text: messageText, scheduledFor }) });
+    setMessageText('');
+    await syncState();
   };
 
-  const loginNewIdentity = () => setState((s) => ({ ...s, identity: makeIdentity(), posts: [], stories: [], messages: [], chats: [] }));
+  const patchMessage = async (id: string, action: 'edit' | 'reaction' | 'disappear', text?: string) => {
+    await json(`/api/messages/${id}`, { method: 'PATCH', body: JSON.stringify({ action, text, reaction: '🔥' }) });
+    await syncState();
+  };
+
+  const deleteMessage = async (id: string) => {
+    await json(`/api/messages/${id}`, { method: 'DELETE' });
+    await syncState();
+  };
+
+  const aiAssist = async () => {
+    const out = await json('/api/ai', { method: 'POST', body: JSON.stringify({ prompt: aiPrompt }) });
+    setAiOut(out.output || 'No output');
+  };
+
+  const startCall = async (mode: 'voice' | 'video' | 'screen' | 'cowatch') => {
+    const res = await json('/api/calls', { method: 'POST', body: JSON.stringify({ mode, chatId: activeChatId }) });
+    setCallLog((l) => [`${mode.toUpperCase()} call created: ${res.callId}`, ...l]);
+  };
+
+  const serverSearch = async () => {
+    if (!search.trim()) return;
+    const res = await json(`/api/search?q=${encodeURIComponent(search)}`);
+    setAiOut(`Search intelligence:\nUsers: ${res.users.length}\nPosts: ${res.posts.length}\nMessages: ${res.messages.length}`);
+  };
 
   if (!state.identity) {
     return (
       <section className="panel">
         <h1>SOCIONET Internet Identity</h1>
-        <p>Create a decentralized identity locally on your device. No password required.</p>
-        <button onClick={loginNewIdentity}>Create Identity</button>
+        <p>No password. Create cryptographic identity and start instantly.</p>
+        <button onClick={createIdentity}>Create Identity</button>
+        {error && <p>{error}</p>}
       </section>
     );
   }
@@ -205,17 +186,20 @@ export default function SocionetApp() {
             onChange={(e) => setState((s) => ({ ...s, identity: s.identity ? { ...s.identity, anonymousMode: e.target.checked } : null }))}
           /> Anonymous mode
         </label>
-        <button onClick={() => {
-          if (!state.identity) return;
-          const profile: Profile = { id: id(), handle: `profile_${id()}`, displayName: 'New Profile', bio: '', tier: 'private', isPrivate: true };
-          setState((s) => s.identity ? { ...s, identity: { ...s.identity, profiles: [...s.identity.profiles, profile], activeProfileId: profile.id } } : s);
-        }}>+ Add Profile</button>
-        <button onClick={() => resetState()}>Reset App</button>
+        <button onClick={() => setState((s) => {
+          if (!s.identity) return s;
+          const profile: Profile = { id: crypto.randomUUID().slice(0, 8), handle: `profile_${Date.now().toString().slice(-4)}`, displayName: 'New Profile', bio: '', tier: 'private', isPrivate: true };
+          return { ...s, identity: { ...s.identity, profiles: [...s.identity.profiles, profile], activeProfileId: profile.id } };
+        })}>+ Add Profile</button>
+        <button onClick={async () => {
+          await json('/api/state', { method: 'DELETE' });
+          setState(defaultState);
+        }}>Reset Server State</button>
       </section>
 
       <section className="panel">
         <h2>Posts + Stories</h2>
-        <textarea value={postText} onChange={(e) => setPostText(e.target.value)} placeholder="Share text/image/video links..." />
+        <textarea value={postText} onChange={(e) => setPostText(e.target.value)} placeholder="Text/Image/Video links" />
         <div className="row">
           <select value={visibility} onChange={(e) => setVisibility(e.target.value as Visibility)}>
             <option value="public">Public</option><option value="friends">Friends</option><option value="close_friends">Close Friends</option><option value="private">Private</option>
@@ -224,76 +208,77 @@ export default function SocionetApp() {
           <button onClick={createStory}>New Story</button>
         </div>
         <div className="feed">
-          {state.posts.map((p) => (
+          {state.posts.map((p: Post) => (
             <article key={p.id} className="card">
               <small>{p.visibility} • {new Date(p.createdAt).toLocaleString()}</small>
               <p>{p.text}</p>
               <div className="row">
-                <button onClick={() => setState((s) => ({ ...s, posts: s.posts.map((x) => x.id === p.id ? { ...x, likes: x.likes.includes(activeProfile!.id) ? x.likes.filter((l) => l !== activeProfile!.id) : [...x.likes, activeProfile!.id] } : x) }))}>♥ {p.likes.length}</button>
+                <button onClick={() => patchPost(p.id, 'like')}>♥ {p.likes.length}</button>
                 <button onClick={() => {
-                  const comment = prompt('Comment');
-                  if (!comment) return;
-                  setState((s) => ({ ...s, posts: s.posts.map((x) => x.id === p.id ? { ...x, comments: [...x.comments, { id: id(), by: activeProfile!.id, text: comment }] } : x) }));
+                  const c = prompt('Comment');
+                  if (!c) return;
+                  patchPost(p.id, 'comment', c);
                 }}>💬 {p.comments.length}</button>
+                <button onClick={() => {
+                  const text = prompt('Edit post', p.text);
+                  if (!text) return;
+                  patchPost(p.id, 'edit', text);
+                }}>Edit</button>
               </div>
             </article>
           ))}
-          {state.stories.map((s) => <div className="story" key={s.id}>📸 {s.text} (expires {new Date(s.expiresAt).toLocaleString()})</div>)}
+          {state.stories.map((s) => <div className="story" key={s.id}>📸 {s.text} (24h story)</div>)}
         </div>
       </section>
 
       <section className="panel">
-        <h2>Messaging + Channels</h2>
+        <h2>Messaging + Communities</h2>
         <div className="row wrap">
           {state.chats.map((c) => <button key={c.id} onClick={() => setActiveChatId(c.id)}>{c.pinned ? '📌 ' : ''}{c.title}</button>)}
-          <button onClick={() => {
-            const title = prompt('Chat title');
-            if (!title || !activeProfile) return;
-            const chat: Chat = { id: id(), title, type: 'group', participants: [activeProfile.id], pinned: false };
-            setState((s) => ({ ...s, chats: [...s.chats, chat] }));
-            setActiveChatId(chat.id);
-          }}>+ New Chat</button>
+          <button onClick={createChat}>+ New Chat</button>
         </div>
-        {activeChat && <small>Active: {activeChat.title}</small>}
+        {activeChat && <small>Active chat: {activeChat.title}</small>}
         <div className="messages">
-          {activeMessages.map((m) => (
+          {activeMessages.map((m: Message) => (
             <div key={m.id} className="msg">
-              <strong>{m.by === activeProfile?.id ? 'You' : m.by}</strong>: {m.text}
-              {m.scheduledFor && <em> (scheduled {new Date(m.scheduledFor).toLocaleTimeString()})</em>}
+              <strong>{m.by === state.identity?.activeProfileId ? 'You' : m.by}</strong>: {m.text} {m.reaction ? ` ${m.reaction}` : ''}
               <div className="row">
-                <button onClick={() => setState((s) => ({ ...s, messages: s.messages.map((x) => x.id === m.id ? { ...x, reaction: '🔥' } : x) }))}>🔥</button>
+                <button onClick={() => patchMessage(m.id, 'reaction')}>🔥</button>
                 <button onClick={() => {
                   const edited = prompt('Edit message', m.text);
                   if (!edited) return;
-                  setState((s) => ({ ...s, messages: s.messages.map((x) => x.id === m.id ? { ...x, text: edited, editedAt: now() } : x) }));
+                  patchMessage(m.id, 'edit', edited);
                 }}>Edit</button>
-                <button onClick={() => setState((s) => ({ ...s, messages: s.messages.filter((x) => x.id !== m.id) }))}>Delete</button>
-                <button onClick={() => setState((s) => ({ ...s, messages: s.messages.map((x) => x.id === m.id ? { ...x, disappearsAt: new Date(Date.now() + 60_000).toISOString() } : x) }))}>Disappear 1m</button>
+                <button onClick={() => patchMessage(m.id, 'disappear')}>Disappear 1m</button>
+                <button onClick={() => deleteMessage(m.id)}>Delete</button>
               </div>
             </div>
           ))}
         </div>
-        <textarea value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Type message..." />
+        <textarea value={messageText} onChange={(e) => setMessageText(e.target.value)} placeholder="Type message" />
         <div className="row">
-          <button onClick={sendMessage}>Send</button>
-          <button onClick={() => sendScheduled(1)}>Schedule +1m</button>
+          <button onClick={() => sendMessage()}>Send</button>
+          <button onClick={() => sendMessage(new Date(Date.now() + 60_000).toISOString())}>Schedule +1m</button>
         </div>
       </section>
 
       <section className="panel">
-        <h2>Calls + Collaboration</h2>
-        <p>Voice/video/screen-share simulation with presence controls.</p>
-        <div className="row">
-          <button onClick={() => alert('Voice call started')}>Voice Call</button>
-          <button onClick={() => alert('Video call started')}>Video Call</button>
-          <button onClick={() => alert('Screen sharing started')}>Share Screen</button>
-          <button onClick={() => alert('Co-watch room opened')}>Co-watch</button>
+        <h2>Calling + Collaboration</h2>
+        <div className="row wrap">
+          <button onClick={() => startCall('voice')}>Voice</button>
+          <button onClick={() => startCall('video')}>Video</button>
+          <button onClick={() => startCall('screen')}>Screen Share</button>
+          <button onClick={() => startCall('cowatch')}>Co-watch</button>
         </div>
+        <div className="feed">{callLog.map((entry) => <div className="card" key={entry}>{entry}</div>)}</div>
       </section>
 
       <section className="panel">
         <h2>Discovery + Search</h2>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users, posts, messages" />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users, messages, posts" />
+        <div className="row">
+          <button onClick={serverSearch}>AI Search</button>
+        </div>
         {searchResults && (
           <div>
             <p><strong>Users:</strong> {searchResults.users.join(', ') || 'none'}</p>
@@ -305,7 +290,7 @@ export default function SocionetApp() {
 
       <section className="panel">
         <h2>AI Assistant</h2>
-        <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Ask for smart replies, content ideas, moderation guidance..." />
+        <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Ask AI for replies/content/moderation" />
         <button onClick={aiAssist}>Generate</button>
         <pre>{aiOut}</pre>
       </section>
@@ -315,17 +300,12 @@ export default function SocionetApp() {
         <div className="row">
           <input placeholder="Latitude" onChange={(e) => setState((s) => ({ ...s, location: { lat: e.target.value, lng: s.location?.lng ?? '', visibleTo: s.location?.visibleTo ?? 'friends' } }))} />
           <input placeholder="Longitude" onChange={(e) => setState((s) => ({ ...s, location: { lat: s.location?.lat ?? '', lng: e.target.value, visibleTo: s.location?.visibleTo ?? 'friends' } }))} />
-          <select onChange={(e) => setState((s) => ({ ...s, location: { lat: s.location?.lat ?? '', lng: s.location?.lng ?? '', visibleTo: e.target.value as Visibility } }))}>
-            <option value="friends">Friends</option>
-            <option value="close_friends">Close Friends</option>
-            <option value="private">Private</option>
-          </select>
         </div>
-        <small>Live location visibility: {state.location?.visibleTo ?? 'not shared'}</small>
+        <small>Visibility: {state.location?.visibleTo ?? 'not shared'}</small>
       </section>
 
       <section className="panel">
-        <h2>Notification Controls</h2>
+        <h2>Notifications</h2>
         {Object.entries(state.notif).map(([k, v]) => (
           <label key={k}><input type="checkbox" checked={v} onChange={(e) => setState((s) => ({ ...s, notif: { ...s.notif, [k]: e.target.checked } }))} /> {k}</label>
         ))}

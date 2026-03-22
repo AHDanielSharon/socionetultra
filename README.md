@@ -1,18 +1,17 @@
-# SOCIONET (Interactive Super App Prototype)
+# SOCIONET — Real Working Super App (Single Render Deploy)
 
-This repository now contains an **installable interactive app**, not just a document page.
+This project now runs as a **real full-stack Next.js app** (UI + API routes + server state), deployable on Render in one deploy.
 
-## Included working modules
-- Decentralized-style identity bootstrap (local DID/principal generation).
-- Multi-profile capability under one identity.
-- Feed/posts with visibility controls, likes, and comments.
-- Stories with 24-hour expiry logic.
-- Messaging/chats/channels with edit/delete/reaction/disappearing/scheduled message support.
-- Calling/collaboration controls (UI simulation hooks).
-- Search across users/posts/messages.
-- AI assistant panel for smart-reply/content-planning flows.
-- Notification and privacy/location controls.
-- PWA manifest for installable behavior.
+## What works now
+- Cryptographic-style internet identity creation (`/api/identity`).
+- Stateful backend data store using server-side JSON DB (`lib/server/db.ts`) and REST APIs.
+- Social feed with create/edit/like/comment (`/api/posts`, `/api/posts/[id]`).
+- Messaging with create/edit/reaction/disappear/delete (`/api/messages`, `/api/messages/[id]`).
+- Communities/chats (`/api/chats`).
+- AI assistant endpoint (`/api/ai`).
+- Search endpoint across users/posts/messages (`/api/search`).
+- Call session creation endpoint (`/api/calls`).
+- Installable PWA metadata.
 
 ## Run locally
 ```bash
@@ -20,11 +19,13 @@ npm ci
 npm run dev
 ```
 
-## Deploy on Render
-- Keep `render.yaml` as-is.
-- Create Blueprint deploy from this repo.
-- Build: `npm ci && npm run build`
-- Start: `npm run start`
+## Render one-deploy setup
+1. Push this repository.
+2. In Render, create a **Blueprint** deploy.
+3. Render reads `render.yaml`.
+4. Build: `npm ci && npm run build`
+5. Start: `npm run start`
 
-## Important scope note
-This is a substantial functional prototype designed for one-deploy setup. For true internet-scale production (global E2EE infra, live media relays, blockchain settlement, anti-abuse pipelines, regional compliance), additional backend services and security audits are required.
+## Notes
+- This implementation is a serious working foundation.
+- For true global internet scale (WebRTC SFU clusters, audited E2EE key mgmt, blockchain finality, compliance infra), the next step is splitting into dedicated services while keeping one-click blueprint deployment.
