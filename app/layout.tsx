@@ -2,9 +2,9 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'SOCIONET — Complete Product Definition',
-  description:
-    'A complete, deployable product blueprint for SOCIONET: decentralized identity, private communications, and AI-native social experiences.'
+  title: 'SOCIONET',
+  description: 'Next-generation decentralized social super app prototype',
+  manifest: '/manifest.webmanifest'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

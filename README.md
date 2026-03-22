@@ -1,43 +1,30 @@
-# SOCIONET
+# SOCIONET (Interactive Super App Prototype)
 
-SOCIONET is a Render-ready foundation for a next-generation decentralized global social app.
+This repository now contains an **installable interactive app**, not just a document page.
 
-## What this repository includes
+## Included working modules
+- Decentralized-style identity bootstrap (local DID/principal generation).
+- Multi-profile capability under one identity.
+- Feed/posts with visibility controls, likes, and comments.
+- Stories with 24-hour expiry logic.
+- Messaging/chats/channels with edit/delete/reaction/disappearing/scheduled message support.
+- Calling/collaboration controls (UI simulation hooks).
+- Search across users/posts/messages.
+- AI assistant panel for smart-reply/content-planning flows.
+- Notification and privacy/location controls.
+- PWA manifest for installable behavior.
 
-- A deployable Next.js application with a complete SOCIONET product definition.
-- A `render.yaml` blueprint for **single-deploy setup** on Render.
-- Product modules covering identity, messaging, calls, feeds, videos, discovery, AI, privacy, and ecosystem expansion.
-
-## Deploy on Render (single deploy)
-
-1. Push this repo to GitHub.
-2. In Render, choose **New + > Blueprint**.
-3. Select this repository.
-4. Render reads `render.yaml` and provisions one web service automatically.
-5. Click deploy.
-
-## Local development
-
+## Run locally
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Then open `http://localhost:3000`.
+## Deploy on Render
+- Keep `render.yaml` as-is.
+- Create Blueprint deploy from this repo.
+- Build: `npm ci && npm run build`
+- Start: `npm run start`
 
-## Build and production run
-
-```bash
-npm run build
-PORT=3000 npm run start
-```
-
-## Notes
-
-- This foundation is intentionally one-service deployable.
-- As features expand, you can still keep one-click deployment by extending `render.yaml` with managed services (database, redis, workers) while preserving a single blueprint deploy workflow.
-
-
-## Render troubleshooting
-
-If you previously deployed a standalone start command and saw `Cannot find module .next/standalone/server.js`, this repo now uses `next start` directly to avoid that runtime mismatch on Render.
+## Important scope note
+This is a substantial functional prototype designed for one-deploy setup. For true internet-scale production (global E2EE infra, live media relays, blockchain settlement, anti-abuse pipelines, regional compliance), additional backend services and security audits are required.
