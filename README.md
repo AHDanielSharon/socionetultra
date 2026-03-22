@@ -36,3 +36,8 @@ PORT=3000 npm run start
 
 - This foundation is intentionally one-service deployable.
 - As features expand, you can still keep one-click deployment by extending `render.yaml` with managed services (database, redis, workers) while preserving a single blueprint deploy workflow.
+
+
+## Render troubleshooting
+
+If you previously deployed a standalone start command and saw `Cannot find module .next/standalone/server.js`, this repo now uses `next start` directly to avoid that runtime mismatch on Render.
