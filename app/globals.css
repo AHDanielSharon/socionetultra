@@ -1,56 +1,120 @@
 :root {
-  color-scheme: dark;
-  --bg: #05060a;
-  --card: #0f1320;
-  --text: #e8ecff;
-  --muted: #a3add4;
-  --accent: #63b3ff;
-  --line: #273053;
+  --bg: #0b1020;
+  --surface: rgba(16, 25, 48, .88);
+  --card: rgba(19, 30, 58, .95);
+  --line: rgba(90, 126, 205, 0.34);
+  --text: #edf1ff;
+  --muted: #aab8dd;
+  --accent: #6cc1ff;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
+  background: radial-gradient(circle at top, #13234d, var(--bg) 55%);
   color: var(--text);
-  background: radial-gradient(circle at top, #101a3b 0%, var(--bg) 46%);
-  font-family: Inter, ui-sans-serif, system-ui;
+  font-family: Inter, system-ui, sans-serif;
 }
-.container { max-width: 1300px; margin: 0 auto; padding: 1.2rem; }
-h1, h2 { margin: .2rem 0 .6rem; }
-p { color: var(--muted); }
-.panel {
+.container { max-width: 960px; margin: 0 auto; padding: .7rem; }
+
+.auth-card, .mobile-shell {
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, #12192f 0%, var(--card) 100%);
-  border-radius: 14px;
-  padding: 1rem;
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  border-radius: 20px;
 }
-.supergrid {
+.auth-card { padding: 1rem; max-width: 700px; margin: 4vh auto; }
+.error { color: #ff9f9f; }
+
+.mobile-shell {
+  height: min(92vh, 860px);
+  max-width: 520px;
+  margin: 1rem auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: .8rem;
+  grid-template-rows: 58px 1fr 70px;
+  overflow: hidden;
 }
+.topbar {
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .65rem .8rem;
+  background: rgba(9, 15, 31, .75);
+}
+.badge { border: 1px solid var(--line); border-radius: 999px; padding: .12rem .5rem; font-size: .75rem; }
+
+.tab-content { overflow-y: auto; padding: .75rem; }
+.bottom-nav {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-top: 1px solid var(--line);
+  background: rgba(8, 14, 28, .95);
+}
+.bottom-nav button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  padding: .35rem 0;
+  gap: .15rem;
+}
+.bottom-nav button.active { color: var(--accent); }
+
 textarea, input, select {
   width: 100%;
-  background: #0a0f1f;
+  border-radius: 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  background: rgba(5, 10, 24, .9);
   color: var(--text);
-  padding: .6rem;
+  padding: .62rem;
 }
-textarea { min-height: 78px; }
-button, .btn {
-  border: 1px solid #2f4d82;
-  color: #dfe9ff;
-  background: #163466;
-  border-radius: 10px;
-  padding: .45rem .7rem;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
+textarea { min-height: 84px; }
+button {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: linear-gradient(180deg, #173b73, #11274f);
+  color: var(--text);
+  padding: .45rem .72rem;
 }
 .row { display: flex; gap: .45rem; align-items: center; margin-top: .5rem; }
 .wrap { flex-wrap: wrap; }
-.feed { display: grid; gap: .5rem; margin-top: .7rem; }
-.card, .story, .msg { background: #0a1226; border: 1px solid #213356; border-radius: 10px; padding: .6rem; }
-.messages { max-height: 230px; overflow: auto; display: grid; gap: .4rem; margin: .6rem 0; }
-pre { white-space: pre-wrap; background: #081125; border: 1px solid #243b67; border-radius: 10px; padding: .6rem; }
-label { display: block; margin-top: .4rem; color: var(--muted); }
+
+.stories-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(82px, 1fr);
+  overflow-x: auto;
+  gap: .5rem;
+  margin-bottom: .65rem;
+}
+.story-bubble {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: .6rem .75rem;
+  background: rgba(17, 33, 68, .95);
+  font-size: .76rem;
+  text-align: center;
+  white-space: nowrap;
+}
+.compose-card, .post-card, .msg, .reel-card, .chat-box {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 16px;
+  padding: .72rem;
+}
+.feed-list { display: grid; gap: .6rem; margin-top: .7rem; }
+.chat-box { max-height: 38vh; overflow-y: auto; display: grid; gap: .5rem; margin: .6rem 0; }
+.reels-view { display: grid; gap: .6rem; }
+.reel-card { min-height: 180px; display: grid; place-items: center; font-size: 1.05rem; }
+pre {
+  white-space: pre-wrap;
+  border-radius: 14px;
+  padding: .7rem;
+  border: 1px solid var(--line);
+  background: rgba(7, 13, 28, .95);
+}
+
+@media (min-width: 900px) {
+  .mobile-shell { max-width: 720px; }
+}

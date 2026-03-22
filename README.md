@@ -1,31 +1,31 @@
-# SOCIONET — Real Working Super App (Single Render Deploy)
+# SOCIONET — Mobile-First Super App (Single Render Deploy)
 
-This project now runs as a **real full-stack Next.js app** (UI + API routes + server state), deployable on Render in one deploy.
+SOCIONET now uses an Instagram/WhatsApp-style app shell with bottom navigation and tabbed interaction (not one long scrolling page).
 
-## What works now
-- Cryptographic-style internet identity creation (`/api/identity`).
-- Stateful backend data store using server-side JSON DB (`lib/server/db.ts`) and REST APIs.
-- Social feed with create/edit/like/comment (`/api/posts`, `/api/posts/[id]`).
-- Messaging with create/edit/reaction/disappear/delete (`/api/messages`, `/api/messages/[id]`).
-- Communities/chats (`/api/chats`).
-- AI assistant endpoint (`/api/ai`).
-- Search endpoint across users/posts/messages (`/api/search`).
-- Call session creation endpoint (`/api/calls`).
-- Installable PWA metadata.
+## Working features
+- Internet Identity flow:
+  - Passkey-based login attempt (WebAuthn) + fallback quick identity.
+  - Cryptographic DID + principal from backend identity endpoint.
+- Decentralized-inspired architecture:
+  - Server-side state ledger (`lib/server/db.ts`) and API-first app design.
+  - Extensible path to blockchain anchoring (content-hash + tx index layer).
+- Feed + Stories + Reels style tab.
+- Real messaging (create/edit/react/disappear/delete/schedule).
+- Communities/chats and call session creation.
+- AI assistant endpoint for smart strategy responses.
+- Explore/search tab across users/posts/messages.
+- Proper install button (`beforeinstallprompt`) with installed state.
 
-## Run locally
+## Deploy on Render (one deploy)
+- Use `render.yaml` blueprint.
+- Build: `npm ci && npm run build`
+- Start: `npm run start`
+
+## Local run
 ```bash
 npm ci
 npm run dev
 ```
 
-## Render one-deploy setup
-1. Push this repository.
-2. In Render, create a **Blueprint** deploy.
-3. Render reads `render.yaml`.
-4. Build: `npm ci && npm run build`
-5. Start: `npm run start`
-
-## Notes
-- This implementation is a serious working foundation.
-- For true global internet scale (WebRTC SFU clusters, audited E2EE key mgmt, blockchain finality, compliance infra), the next step is splitting into dedicated services while keeping one-click blueprint deployment.
+## Production next step
+For true global decentralized production, add dedicated chain/indexer + object storage/IPFS + WebRTC SFU + audited E2EE key service while keeping one blueprint deploy orchestration.

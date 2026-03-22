@@ -3,10 +3,10 @@ import Link from 'next/link';
 export default function HomePage() {
   return (
     <main className="container">
-      <section className="panel">
+      <section className="auth-card">
         <h1>SOCIONET</h1>
-        <p>The app is now an interactive installable prototype. Open the live super app workspace below.</p>
-        <Link href="/socionet" className="btn">Launch SOCIONET App</Link>
+        <p>Legendary super app experience with internet identity login, social feed, messaging, calls, discovery, AI, and installable PWA.</p>
+        <Link href="/socionet"><button>Open SOCIONET</button></Link>
       </section>
     </main>
   );
